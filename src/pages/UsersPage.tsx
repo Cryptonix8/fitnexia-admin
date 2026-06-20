@@ -1,11 +1,25 @@
-import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import DataPanel, { EmptyState, ErrorBanner, LoadingState } from '../components/DataPanel'
+import Pagination from '../components/Pagination'
 import PageHeader from '../components/PageHeader'
 import RoleBadge from '../components/RoleBadge'
+import UserEditModal from '../components/UserEditModal'
+import { IconPencil, IconTrash } from '../components/icons'
 import { api } from '../lib/api'
-import type { AdminUserListItem, Paginated } from '../lib/types'
+import { getStoredUser } from '../lib/storage'
+import type { AdminUserListItem, Paginated, UserRole } from '../lib/types'
+
+const PAGE_SIZE = 10
+
+const ROLES: { value: '' | UserRole; label: string }[] = [
+  { value: '', label: 'All roles' },
+  { value: 'athlete', label: 'Athlete' },
+  { value: 'instructor', label: 'Instructor' },
+  { value: 'institution', label: 'Institution' },
+  { value: 'admin', label: 'Admin' },
+]
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -19,123 +33,255 @@ function shortId(id: string) {
   return `${id.slice(0, 8)}…`
 }
 
-export default function UsersPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const page = Number(searchParams.get('page') ?? '1') || 1
-  const limit = Number(searchParams.get('limit') ?? '20') || 20
-  const [localLimit, setLocalLimit] = useState(String(limit))
+function buildParams(params: Record<string, string>) {
+  const next = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) next.set(key, value)
+  })
+  return next
+}
 
-  const q = useQuery({
-    queryKey: ['admin', 'users', { page, limit }],
+export default function UsersPage() {
+  const qc = useQueryClient()
+  const currentUser = getStoredUser()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const page = Number(searchParams.get('page') ?? '1') || 1
+  const limit = PAGE_SIZE
+  const q = searchParams.get('q') ?? ''
+  const roleFilter = searchParams.get('role') ?? ''
+
+  const [searchInput, setSearchInput] = useState(q)
+  const [editingUser, setEditingUser] = useState<AdminUserListItem | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSearchInput(q)
+  }, [q])
+
+  const queryParams = useMemo(() => {
+    const params: Record<string, string> = {
+      page: String(page),
+      limit: String(limit),
+    }
+    if (q) params.q = q
+    if (roleFilter) params.role = roleFilter
+    return params
+  }, [page, limit, q, roleFilter])
+
+  const listQuery = useQuery({
+    queryKey: ['admin', 'users', queryParams],
     queryFn: async () =>
-      (await api.get<Paginated<AdminUserListItem>>('/admin/users', { params: { page, limit } }))
-        .data,
+      (await api.get<Paginated<AdminUserListItem>>('/admin/users', { params: queryParams })).data,
   })
 
-  const pagination = useMemo(() => {
-    const pages = q.data?.meta.pages ?? 1
-    return { pages, canPrev: page > 1, canNext: page < pages }
-  }, [q.data, page])
+  const remove = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/admin/users/${id}`)).data,
+    onSuccess: async () => {
+      setActionError(null)
+      await qc.invalidateQueries({ queryKey: ['admin', 'users'] })
+    },
+    onError: (err: unknown) => {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+      setActionError(
+        axiosErr.response?.data?.error?.message || 'Failed to delete user',
+      )
+    },
+  })
+
+  const totalPages = listQuery.data?.meta.totalPages ?? 1
+
+  function applyFilters(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const fd = new FormData(e.currentTarget)
+    const nextQ = String(fd.get('q') ?? '').trim()
+    const nextRole = String(fd.get('role') ?? '')
+    setSearchParams(
+      buildParams({
+        page: '1',
+        q: nextQ,
+        role: nextRole,
+      }),
+    )
+  }
+
+  function clearFilters() {
+    setSearchInput('')
+    setSearchParams({})
+  }
+
+  function changePage(nextPage: number) {
+    setSearchParams(
+      buildParams({
+        page: String(nextPage),
+        q,
+        role: roleFilter,
+      }),
+    )
+  }
+
+  function handleDelete(user: AdminUserListItem) {
+    const label = user.displayName || user.email
+    const ok = window.confirm(
+      `Delete "${label}"?\n\nThis soft-deletes the account and revokes active sessions.`,
+    )
+    if (!ok) return
+    remove.mutate(user.id)
+  }
 
   return (
     <>
       <PageHeader
         title="Users"
-        description="Browse and manage registered accounts across the platform."
+        description="Search, filter, edit roles, and remove accounts from the platform."
       />
+
+      {actionError ? (
+        <div className="alert alertError" style={{ marginBottom: 16 }}>
+          {actionError}
+        </div>
+      ) : null}
+
+      <div className="filterBar">
+        <form className="filterBarForm" onSubmit={applyFilters}>
+          <label className="field filterField">
+            <span className="fieldLabel">Search</span>
+            <input
+              className="input"
+              type="search"
+              name="q"
+              placeholder="Name or email…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+          </label>
+
+          <label className="field filterField">
+            <span className="fieldLabel">Role</span>
+            <select
+              className="input"
+              name="role"
+              value={roleFilter}
+              onChange={(e) => {
+                const nextRole = e.target.value
+                setSearchParams(
+                  buildParams({
+                    page: '1',
+                    q,
+                    role: nextRole,
+                  }),
+                )
+              }}
+            >
+              {ROLES.map((r) => (
+                <option key={r.value || 'all'} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="filterActions">
+            <button className="btn btnPrimary btnSm" type="submit">
+              Search
+            </button>
+            <button className="btn btnSm" type="button" onClick={clearFilters}>
+              Clear
+            </button>
+          </div>
+        </form>
+      </div>
 
       <DataPanel
         title="All users"
         toolbar={
-          <>
-            {q.data ? (
-              <span className="pill">{q.data.meta.total.toLocaleString()} total</span>
-            ) : null}
-            <form
-              className="row"
-              onSubmit={(e) => {
-                e.preventDefault()
-                const nextLimit = Number(localLimit) || 20
-                setSearchParams({ page: '1', limit: String(nextLimit) })
-              }}
-            >
-              <select className="input" style={{ width: 'auto' }} value={localLimit} onChange={(e) => setLocalLimit(e.target.value)}>
-                <option value="10">10 / page</option>
-                <option value="20">20 / page</option>
-                <option value="50">50 / page</option>
-                <option value="100">100 / page</option>
-              </select>
-              <button className="btn btnSm" type="submit">
-                Apply
-              </button>
-            </form>
-          </>
+          listQuery.data ? (
+            <span className="pill">{listQuery.data.meta.total.toLocaleString()} matching</span>
+          ) : null
         }
       >
-        {q.isLoading ? <LoadingState /> : null}
-        {q.isError ? <ErrorBanner message="Failed to load users." /> : null}
+        {listQuery.isLoading ? <LoadingState /> : null}
+        {listQuery.isError ? <ErrorBanner message="Failed to load users." /> : null}
 
-        {q.data && q.data.data.length === 0 ? (
-          <EmptyState title="No users found" description="There are no users in the system yet." />
+        {listQuery.data && listQuery.data.data.length === 0 ? (
+          <EmptyState
+            title="No users found"
+            description={
+              q || roleFilter
+                ? 'Try adjusting your search or role filter.'
+                : 'There are no users in the system yet.'
+            }
+          />
         ) : null}
 
-        {q.data && q.data.data.length > 0 ? (
+        {listQuery.data && listQuery.data.data.length > 0 ? (
           <>
             <div className="tableWrap">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>User</th>
+                    <th>Email</th>
                     <th>Role</th>
                     <th>Joined</th>
                     <th>ID</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {q.data.data.map((u) => (
-                    <tr key={u.id}>
-                      <td>
-                        <Link to={`/users/${u.id}`} className="tableCellTitle" style={{ display: 'block' }}>
-                          {u.email}
-                        </Link>
-                      </td>
-                      <td>
-                        <RoleBadge role={u.role} />
-                      </td>
-                      <td>{formatDate(u.createdAt)}</td>
-                      <td>
-                        <Link to={`/users/${u.id}`} className="tableLink" title={u.id}>
-                          {shortId(u.id)}
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {listQuery.data.data.map((u) => {
+                    const isSelf = currentUser?.id === u.id
+                    return (
+                      <tr key={u.id}>
+                        <td>
+                          <Link to={`/users/${u.id}`} className="tableCellTitle">
+                            {u.email}
+                          </Link>
+                        </td>
+                        <td>
+                          <RoleBadge role={u.role} />
+                        </td>
+                        <td>{formatDate(u.createdAt)}</td>
+                        <td>
+                          <Link to={`/users/${u.id}`} className="tableLink" title={u.id}>
+                            {shortId(u.id)}
+                          </Link>
+                        </td>
+                        <td>
+                          <div className="btnGroup">
+                            <button
+                              type="button"
+                              className="btn btnIcon btnSm"
+                              aria-label={`Edit ${u.email}`}
+                              title="Edit"
+                              onClick={() => setEditingUser(u)}
+                            >
+                              <IconPencil />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btnIcon btnDanger btnSm"
+                              disabled={isSelf || remove.isPending}
+                              aria-label={`Delete ${u.email}`}
+                              title={isSelf ? 'You cannot delete your own account' : 'Delete'}
+                              onClick={() => handleDelete(u)}
+                            >
+                              <IconTrash />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
 
-            <div className="pagination">
-              <button
-                className="btn btnSm"
-                disabled={!pagination.canPrev}
-                onClick={() => setSearchParams({ page: String(page - 1), limit: String(limit) })}
-              >
-                ← Previous
-              </button>
-              <span className="paginationInfo">
-                Page {page} of {pagination.pages}
-              </span>
-              <button
-                className="btn btnSm"
-                disabled={!pagination.canNext}
-                onClick={() => setSearchParams({ page: String(page + 1), limit: String(limit) })}
-              >
-                Next →
-              </button>
-            </div>
+            <Pagination page={page} totalPages={totalPages} onChange={changePage} />
           </>
         ) : null}
       </DataPanel>
+
+      <UserEditModal user={editingUser} onClose={() => setEditingUser(null)} />
     </>
   )
 }

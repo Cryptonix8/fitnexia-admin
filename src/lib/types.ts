@@ -9,7 +9,7 @@ export type AuthResponse = {
 
 export type Paginated<T> = {
   data: T[]
-  meta: { total: number; page: number; limit: number; pages: number }
+  meta: { total: number; page: number; limit: number; totalPages: number }
 }
 
 export type AdminUserListItem = {
@@ -17,6 +17,7 @@ export type AdminUserListItem = {
   email: string
   role: UserRole
   createdAt: string
+  displayName?: string | null
 }
 
 export type VerificationRequest = {

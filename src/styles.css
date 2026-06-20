@@ -289,7 +289,6 @@ button, input, select, textarea { font: inherit; }
 
 .content {
   padding: 32px 40px 48px;
-  max-width: 1280px;
 }
 
 /* ─── Page header ───────────────────────────────────────── */
@@ -660,6 +659,14 @@ button, input, select, textarea { font: inherit; }
 
 .btnSm { padding: 8px 14px; font-size: 13px; }
 
+.btnIcon {
+  padding: 8px;
+  min-width: 36px;
+  justify-content: center;
+}
+
+.btnIcon svg { width: 16px; height: 16px; }
+
 .btnBlock { width: 100%; }
 
 .btnGroup { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -962,6 +969,113 @@ button, input, select, textarea { font: inherit; }
 
 .paginationInfo { font-size: 13px; color: var(--muted); }
 
+/* Numbered pager (reference UI) */
+.pager {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 20px 22px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.pagerNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition), background var(--transition);
+}
+
+.pagerNavPrev {
+  justify-self: start;
+}
+
+.pagerNavNext {
+  justify-self: end;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.pagerNav svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pagerNav:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+.pagerNav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagerNavNext:hover:not(:disabled) {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.pagerPages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pagerPage {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.pagerPage:hover {
+  background: var(--surface-muted);
+}
+
+.pagerPageActive {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.pagerPageActive:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.pagerEllipsis {
+  min-width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  user-select: none;
+}
+
 /* ─── Verification cards (mobile-friendly rows) ─────────── */
 
 .queueList { display: flex; flex-direction: column; }
@@ -1029,6 +1143,94 @@ button, input, select, textarea { font: inherit; }
 
 .reviewMeta span { font-family: var(--mono); }
 
+/* ─── Filters & modals ──────────────────────────────────── */
+
+.filterBar {
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.filterBarForm {
+  display: grid;
+  grid-template-columns: 1fr 180px auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.filterField { margin: 0; }
+
+.filterActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  width: 100%;
+  max-width: 460px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
+  animation: modalIn 0.18s ease-out;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 22px 0;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.modalSub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.modalBody {
+  padding: 20px 22px 22px;
+}
+
+.modalFooter {
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
 /* ─── Responsive ────────────────────────────────────────── */
 
 @media (max-width: 960px) {
@@ -1040,6 +1242,16 @@ button, input, select, textarea { font: inherit; }
   .pageTitle { font-size: 24px; }
   .queueItem { grid-template-columns: 1fr; }
   .queueItemActions { min-width: 0; }
+  .filterBarForm { grid-template-columns: 1fr; }
+  .pager {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 12px;
+  }
+  .pagerNavPrev,
+  .pagerNavNext {
+    justify-self: center;
+  }
 }
 
 @media (max-width: 640px) {
