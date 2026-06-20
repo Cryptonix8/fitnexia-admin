@@ -137,6 +137,26 @@ button, input, select, textarea { font: inherit; }
 
 .sidebar > * { position: relative; z-index: 1; }
 
+.sidebarBrand {
+  padding: 4px 14px 20px;
+  margin-bottom: 4px;
+}
+
+.sidebarBrand h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #fff;
+}
+
+.sidebarBrand p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .brand {
   display: flex;
   align-items: center;

@@ -1,5 +1,4 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import BrandLogo from './BrandLogo'
 import { IconChart, IconFlag, IconLogout, IconShield, IconUsers } from './icons'
 import ThemeToggle from './ThemeToggle'
 import { clearAuth, getStoredUser } from '../lib/storage'
@@ -19,8 +18,10 @@ export default function Shell() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <BrandLogo subtitle="Internal panel" />
-
+        <div className="sidebarBrand">
+          <h3>FITNEXIA ADMIN</h3>
+          <p>Internal panel</p>
+        </div>
         <div className="navSection">Menu</div>
         <nav className="nav">
           {navItems.map(({ to, label, icon: Icon }) => (
