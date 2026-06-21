@@ -258,6 +258,21 @@ button, input, select, textarea { font: inherit; }
   border: 1px solid var(--sidebar-border);
 }
 
+.userCardButton {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.userCardButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--sidebar-border));
+}
+
 .userAvatar {
   width: 36px;
   height: 36px;
@@ -954,6 +969,67 @@ button, input, select, textarea { font: inherit; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.loadingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.loadingOverlayCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 36px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
+}
+
+.loadingOverlayLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.spinnerLg {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.tableCheckCol {
+  width: 44px;
+  padding-left: 16px !important;
+  padding-right: 8px !important;
+}
+
+.tableCheck {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.tableCheck:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bulkBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .stack { display: flex; flex-direction: column; gap: 20px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .mono { font-family: var(--mono); font-size: 12px; }
@@ -1156,18 +1232,12 @@ button, input, select, textarea { font: inherit; }
 
 .filterBarForm {
   display: grid;
-  grid-template-columns: 1fr 180px auto;
+  grid-template-columns: 1fr 180px;
   gap: 14px;
   align-items: end;
 }
 
 .filterField { margin: 0; }
-
-.filterActions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
 
 .modalBackdrop {
   position: fixed;
@@ -1229,6 +1299,14 @@ button, input, select, textarea { font: inherit; }
 .modalFooter {
   justify-content: flex-end;
   padding-top: 4px;
+}
+
+.confirmModalMessage {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-line;
 }
 
 /* ─── Responsive ────────────────────────────────────────── */

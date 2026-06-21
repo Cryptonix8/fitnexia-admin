@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import DataPanel, { EmptyState, ErrorBanner, LoadingState } from '../components/DataPanel'
+import DataPanel, { EmptyState, ErrorBanner } from '../components/DataPanel'
+import LoadingOverlay from '../components/LoadingOverlay'
 import PageHeader from '../components/PageHeader'
 import RoleBadge from '../components/RoleBadge'
 import { api } from '../lib/api'
@@ -37,8 +38,21 @@ export default function VerificationRequestsPage() {
     onSuccess: async () => qc.invalidateQueries({ queryKey: ['admin', 'verification-requests'] }),
   })
 
+  const isBusy = q.isLoading || q.isFetching || approve.isPending || reject.isPending
+
   return (
     <>
+      <LoadingOverlay
+        show={isBusy}
+        label={
+          approve.isPending
+            ? 'Approving request…'
+            : reject.isPending
+              ? 'Rejecting request…'
+              : 'Loading verification queue…'
+        }
+      />
+
       <PageHeader
         title="Verification"
         description="Review pending instructor and institution profile verification requests."
@@ -48,7 +62,6 @@ export default function VerificationRequestsPage() {
         title="Pending requests"
         toolbar={q.data ? <span className="pill">{q.data.length} pending</span> : null}
       >
-        {q.isLoading ? <LoadingState /> : null}
         {q.isError ? <ErrorBanner message="Failed to load verification queue." /> : null}
 
         {q.data && q.data.length === 0 ? (

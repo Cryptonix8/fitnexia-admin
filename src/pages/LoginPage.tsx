@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
+import LoadingOverlay from '../components/LoadingOverlay'
 import { IconEye, IconEyeOff } from '../components/icons'
 import { api } from '../lib/api'
 import { storeAuth } from '../lib/storage'
@@ -14,6 +15,11 @@ export default function LoginPage() {
     return typeof from === 'string' && from.startsWith('/') ? from : '/metrics'
   }, [location.state])
 
+  const notice = useMemo(() => {
+    const message = (location.state as { message?: string } | null)?.message
+    return typeof message === 'string' ? message : null
+  }, [location.state])
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -25,7 +31,10 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      const res = await api.post<AuthResponse>('/auth/login', { email, password })
+      const res = await api.post<AuthResponse>('/auth/login', {
+        email: email.trim(),
+        password,
+      })
       storeAuth({
         accessToken: res.data.accessToken,
         refreshToken: res.data.refreshToken,
@@ -50,6 +59,7 @@ export default function LoginPage() {
 
   return (
     <div className="loginShell">
+      <LoadingOverlay show={loading} label="Signing in…" />
       <div className="loginHero">
         <div className="loginHeroContent">
           <h1 className="loginHeroBrand">FITNEXIA</h1>
@@ -106,6 +116,19 @@ export default function LoginPage() {
                 </button>
               </div>
             </label>
+
+            {notice ? (
+              <div
+                className="alert alertError"
+                style={{
+                  background: 'var(--success-soft)',
+                  color: 'var(--success)',
+                  borderColor: 'color-mix(in srgb, var(--success) 25%, transparent)',
+                }}
+              >
+                {notice}
+              </div>
+            ) : null}
 
             {error ? <div className="alert alertError">{error}</div> : null}
 

@@ -1,22 +1,46 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { IconChart, IconFlag, IconLogout, IconShield, IconUsers } from './icons'
+import { useEffect, useState } from 'react'
+import LoadingOverlay from './LoadingOverlay'
+import { IconChart, IconLogout, IconShield, IconUsers } from './icons'
 import ThemeToggle from './ThemeToggle'
-import { clearAuth, getStoredUser } from '../lib/storage'
+import { api } from '../lib/api'
+import { clearAuth, getRefreshToken, getStoredUser } from '../lib/storage'
 
 const navItems = [
   { to: '/metrics', label: 'Overview', icon: IconChart },
   { to: '/users', label: 'Users', icon: IconUsers },
   { to: '/verification', label: 'Verification', icon: IconShield },
-  { to: '/reviews/reported', label: 'Moderation', icon: IconFlag },
 ] as const
 
 export default function Shell() {
   const navigate = useNavigate()
-  const user = getStoredUser()
+  const [user, setUser] = useState(getStoredUser)
+  const [signingOut, setSigningOut] = useState(false)
   const initial = user?.email?.[0]?.toUpperCase() ?? 'A'
+
+  useEffect(() => {
+    const sync = () => setUser(getStoredUser())
+    window.addEventListener('fitnexia-admin-user-updated', sync)
+    return () => window.removeEventListener('fitnexia-admin-user-updated', sync)
+  }, [])
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      const refreshToken = getRefreshToken()
+      if (refreshToken) {
+        await api.post('/auth/logout', { refreshToken }).catch(() => undefined)
+      }
+    } finally {
+      clearAuth()
+      setSigningOut(false)
+      navigate('/login')
+    }
+  }
 
   return (
     <div className="shell">
+      <LoadingOverlay show={signingOut} label="Signing out…" />
       <aside className="sidebar">
         <div className="sidebarBrand">
           <h3>FITNEXIA ADMIN</h3>
@@ -38,7 +62,11 @@ export default function Shell() {
 
         <div className="sidebarFooter">
           {user ? (
-            <div className="userCard">
+            <button
+              type="button"
+              className="userCard userCardButton"
+              onClick={() => navigate('/profile')}
+            >
               <div className="userAvatar">{initial}</div>
               <div style={{ minWidth: 0 }}>
                 <div className="userRole">Administrator</div>
@@ -46,7 +74,7 @@ export default function Shell() {
                   {user.email}
                 </div>
               </div>
-            </div>
+            </button>
           ) : null}
 
           <ThemeToggle variant="sidebar" />
@@ -54,10 +82,8 @@ export default function Shell() {
           <button
             className="btn btnGhost btnBlock"
             style={{ color: 'var(--sidebar-muted)', borderColor: 'var(--sidebar-border)' }}
-            onClick={() => {
-              clearAuth()
-              navigate('/login')
-            }}
+            disabled={signingOut}
+            onClick={handleSignOut}
           >
             <IconLogout />
             Sign out

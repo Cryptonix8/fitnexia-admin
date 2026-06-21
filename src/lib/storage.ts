@@ -22,6 +22,13 @@ export function getStoredUser(): StoredUser | null {
   }
 }
 
+export function updateStoredUser(partial: Partial<StoredUser>) {
+  const user = getStoredUser()
+  if (!user) return
+  localStorage.setItem(USER_KEY, JSON.stringify({ ...user, ...partial }))
+  window.dispatchEvent(new CustomEvent('fitnexia-admin-user-updated'))
+}
+
 export function storeAuth(params: {
   accessToken: string
   refreshToken: string

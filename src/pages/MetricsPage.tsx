@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import DataPanel, { ErrorBanner, LoadingState } from '../components/DataPanel'
+import DataPanel, { ErrorBanner } from '../components/DataPanel'
+import LoadingOverlay from '../components/LoadingOverlay'
 import {
   IconBuilding,
   IconCalendar,
@@ -27,12 +28,16 @@ export default function MetricsPage() {
 
   return (
     <>
+      <LoadingOverlay
+        show={q.isLoading || q.isFetching}
+        label="Loading metrics…"
+      />
+
       <PageHeader
         title="Dashboard"
         description="Platform overview — users, instructors, classes, and bookings at a glance."
       />
 
-      {q.isLoading ? <LoadingState label="Loading metrics…" /> : null}
       {q.isError ? <ErrorBanner message="Could not load metrics. Check your connection and admin access." /> : null}
 
       {q.data ? (
@@ -77,9 +82,6 @@ export default function MetricsPage() {
           </Link>
           <Link className="btn btnSm" to="/verification">
             Review verifications
-          </Link>
-          <Link className="btn btnSm" to="/reviews/reported">
-            Moderate reviews
           </Link>
         </div>
       </DataPanel>

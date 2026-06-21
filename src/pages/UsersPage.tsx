@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import DataPanel, { EmptyState, ErrorBanner, LoadingState } from '../components/DataPanel'
+import ConfirmModal from '../components/ConfirmModal'
+import DataPanel, { EmptyState, ErrorBanner } from '../components/DataPanel'
+import LoadingOverlay from '../components/LoadingOverlay'
 import Pagination from '../components/Pagination'
 import PageHeader from '../components/PageHeader'
 import RoleBadge from '../components/RoleBadge'
@@ -41,10 +43,16 @@ function buildParams(params: Record<string, string>) {
   return next
 }
 
+type DeleteConfirm =
+  | { kind: 'single'; user: AdminUserListItem }
+  | { kind: 'bulk'; ids: string[] }
+  | null
+
 export default function UsersPage() {
   const qc = useQueryClient()
   const currentUser = getStoredUser()
   const [searchParams, setSearchParams] = useSearchParams()
+  const selectAllRef = useRef<HTMLInputElement>(null)
 
   const page = Number(searchParams.get('page') ?? '1') || 1
   const limit = PAGE_SIZE
@@ -52,12 +60,18 @@ export default function UsersPage() {
   const roleFilter = searchParams.get('role') ?? ''
 
   const [searchInput, setSearchInput] = useState(q)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingUser, setEditingUser] = useState<AdminUserListItem | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirm>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     setSearchInput(q)
   }, [q])
+
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [page, q, roleFilter])
 
   const queryParams = useMemo(() => {
     const params: Record<string, string> = {
@@ -75,6 +89,20 @@ export default function UsersPage() {
       (await api.get<Paginated<AdminUserListItem>>('/admin/users', { params: queryParams })).data,
   })
 
+  const pageUsers = listQuery.data?.data ?? []
+  const selectableUsers = pageUsers.filter((u) => u.id !== currentUser?.id)
+  const selectedOnPage = selectableUsers.filter((u) => selectedIds.has(u.id))
+  const allPageSelected =
+    selectableUsers.length > 0 && selectedOnPage.length === selectableUsers.length
+  const somePageSelected =
+    selectedOnPage.length > 0 && selectedOnPage.length < selectableUsers.length
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected
+    }
+  }, [somePageSelected])
+
   const remove = useMutation({
     mutationFn: async (id: string) => (await api.delete(`/admin/users/${id}`)).data,
     onSuccess: async () => {
@@ -83,31 +111,54 @@ export default function UsersPage() {
     },
     onError: (err: unknown) => {
       const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
-      setActionError(
-        axiosErr.response?.data?.error?.message || 'Failed to delete user',
-      )
+      setActionError(axiosErr.response?.data?.error?.message || 'Failed to delete user')
+    },
+  })
+
+  const bulkRemove = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const failures: string[] = []
+      for (const id of ids) {
+        try {
+          await api.delete(`/admin/users/${id}`)
+        } catch (err: unknown) {
+          const axiosErr = err as { response?: { data?: { error?: { message?: string } } } }
+          const user = pageUsers.find((u) => u.id === id)
+          const label = user?.email ?? id.slice(0, 8)
+          failures.push(`${label}: ${axiosErr.response?.data?.error?.message || 'Failed'}`)
+        }
+      }
+      if (failures.length) {
+        throw new Error(failures.join('\n'))
+      }
+    },
+    onSuccess: async () => {
+      setActionError(null)
+      setSelectedIds(new Set())
+      await qc.invalidateQueries({ queryKey: ['admin', 'users'] })
+    },
+    onError: (err: unknown) => {
+      setActionError(err instanceof Error ? err.message : 'Failed to delete selected users')
     },
   })
 
   const totalPages = listQuery.data?.meta.totalPages ?? 1
+  const isPageLoading = listQuery.isLoading || listQuery.isFetching
+  const isDeleting = remove.isPending || bulkRemove.isPending
 
-  function applyFilters(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const nextQ = String(fd.get('q') ?? '').trim()
-    const nextRole = String(fd.get('role') ?? '')
+  function applySearchQuery(nextQ: string) {
+    const trimmed = nextQ.trim()
     setSearchParams(
       buildParams({
         page: '1',
-        q: nextQ,
-        role: nextRole,
+        q: trimmed,
+        role: roleFilter,
       }),
     )
   }
 
-  function clearFilters() {
-    setSearchInput('')
-    setSearchParams({})
+  function handleSearchKeyUp(e: React.KeyboardEvent<HTMLInputElement>) {
+    applySearchQuery(e.currentTarget.value)
   }
 
   function changePage(nextPage: number) {
@@ -120,54 +171,110 @@ export default function UsersPage() {
     )
   }
 
-  function handleDelete(user: AdminUserListItem) {
-    const label = user.displayName || user.email
-    const ok = window.confirm(
-      `Delete "${label}"?\n\nThis soft-deletes the account and revokes active sessions.`,
-    )
-    if (!ok) return
-    remove.mutate(user.id)
+  function toggleUser(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
+
+  function toggleSelectAllOnPage() {
+    if (allPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        selectableUsers.forEach((u) => next.delete(u.id))
+        return next
+      })
+      return
+    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      selectableUsers.forEach((u) => next.add(u.id))
+      return next
+    })
+  }
+
+  function handleDelete(user: AdminUserListItem) {
+    setDeleteConfirm({ kind: 'single', user })
+  }
+
+  function handleBulkDelete() {
+    const ids = [...selectedIds]
+    if (!ids.length) return
+    setDeleteConfirm({ kind: 'bulk', ids })
+  }
+
+  function confirmDelete() {
+    if (!deleteConfirm) return
+    if (deleteConfirm.kind === 'single') {
+      remove.mutate(deleteConfirm.user.id)
+    } else {
+      bulkRemove.mutate(deleteConfirm.ids)
+    }
+    setDeleteConfirm(null)
+  }
+
+  const deleteModal =
+    deleteConfirm?.kind === 'single'
+      ? {
+          title: 'Delete user',
+          message: `Delete "${deleteConfirm.user.displayName || deleteConfirm.user.email}"?\n\nThis soft-deletes the account and revokes active sessions.`,
+          confirmLabel: 'Delete user',
+        }
+      : deleteConfirm?.kind === 'bulk'
+        ? {
+            title: 'Delete selected users',
+            message: `Delete ${deleteConfirm.ids.length} selected user${deleteConfirm.ids.length === 1 ? '' : 's'}?\n\nThis soft-deletes the accounts and revokes active sessions.`,
+            confirmLabel: 'Delete selected',
+          }
+        : null
 
   return (
     <>
-      <PageHeader
-        title="Users"
-        description="Search, filter, edit roles, and remove accounts from the platform."
+      <LoadingOverlay
+        show={isPageLoading || isDeleting}
+        label={
+          isDeleting
+            ? bulkRemove.isPending
+              ? 'Deleting selected users…'
+              : 'Deleting user…'
+            : 'Loading users…'
+        }
       />
 
+      <PageHeader title="Users" />
+
       {actionError ? (
-        <div className="alert alertError" style={{ marginBottom: 16 }}>
+        <div className="alert alertError" style={{ marginBottom: 16, whiteSpace: 'pre-line' }}>
           {actionError}
         </div>
       ) : null}
 
       <div className="filterBar">
-        <form className="filterBarForm" onSubmit={applyFilters}>
+        <div className="filterBarForm">
           <label className="field filterField">
-            <span className="fieldLabel">Search</span>
             <input
               className="input"
               type="search"
-              name="q"
               placeholder="Name or email…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
+              onKeyUp={handleSearchKeyUp}
             />
           </label>
 
           <label className="field filterField">
-            <span className="fieldLabel">Role</span>
             <select
               className="input"
-              name="role"
               value={roleFilter}
               onChange={(e) => {
                 const nextRole = e.target.value
                 setSearchParams(
                   buildParams({
                     page: '1',
-                    q,
+                    q: searchInput.trim(),
                     role: nextRole,
                   }),
                 )
@@ -180,27 +287,33 @@ export default function UsersPage() {
               ))}
             </select>
           </label>
-
-          <div className="filterActions">
-            <button className="btn btnPrimary btnSm" type="submit">
-              Search
-            </button>
-            <button className="btn btnSm" type="button" onClick={clearFilters}>
-              Clear
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
 
       <DataPanel
         title="All users"
         toolbar={
-          listQuery.data ? (
-            <span className="pill">{listQuery.data.meta.total.toLocaleString()} matching</span>
-          ) : null
+          <div className="bulkBar">
+            {selectedIds.size > 0 ? (
+              <>
+                <span className="pill">{selectedIds.size} selected</span>
+                <button
+                  type="button"
+                  className="btn btnDanger btnSm"
+                  disabled={isDeleting}
+                  onClick={handleBulkDelete}
+                >
+                  <IconTrash />
+                  Delete selected
+                </button>
+              </>
+            ) : null}
+            {listQuery.data ? (
+              <span className="pill">{listQuery.data.meta.total.toLocaleString()} matching</span>
+            ) : null}
+          </div>
         }
       >
-        {listQuery.isLoading ? <LoadingState /> : null}
         {listQuery.isError ? <ErrorBanner message="Failed to load users." /> : null}
 
         {listQuery.data && listQuery.data.data.length === 0 ? (
@@ -220,6 +333,18 @@ export default function UsersPage() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th className="tableCheckCol">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        className="tableCheck"
+                        checked={allPageSelected}
+                        disabled={selectableUsers.length === 0 || isDeleting}
+                        aria-label="Select all users on this page"
+                        onChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
                     <th>Joined</th>
@@ -232,8 +357,23 @@ export default function UsersPage() {
                     const isSelf = currentUser?.id === u.id
                     return (
                       <tr key={u.id}>
+                        <td className="tableCheckCol">
+                          <input
+                            type="checkbox"
+                            className="tableCheck"
+                            checked={selectedIds.has(u.id)}
+                            disabled={isSelf || isDeleting}
+                            aria-label={`Select ${u.email}`}
+                            onChange={() => toggleUser(u.id)}
+                          />
+                        </td>
                         <td>
                           <Link to={`/users/${u.id}`} className="tableCellTitle">
+                            {u.displayName || '—'}
+                          </Link>
+                        </td>
+                        <td>
+                          <Link to={`/users/${u.id}`} className="tableLink">
                             {u.email}
                           </Link>
                         </td>
@@ -253,6 +393,7 @@ export default function UsersPage() {
                               className="btn btnIcon btnSm"
                               aria-label={`Edit ${u.email}`}
                               title="Edit"
+                              disabled={isDeleting}
                               onClick={() => setEditingUser(u)}
                             >
                               <IconPencil />
@@ -260,7 +401,7 @@ export default function UsersPage() {
                             <button
                               type="button"
                               className="btn btnIcon btnDanger btnSm"
-                              disabled={isSelf || remove.isPending}
+                              disabled={isSelf || isDeleting}
                               aria-label={`Delete ${u.email}`}
                               title={isSelf ? 'You cannot delete your own account' : 'Delete'}
                               onClick={() => handleDelete(u)}
@@ -282,6 +423,15 @@ export default function UsersPage() {
       </DataPanel>
 
       <UserEditModal user={editingUser} onClose={() => setEditingUser(null)} />
+
+      <ConfirmModal
+        open={Boolean(deleteModal)}
+        title={deleteModal?.title ?? ''}
+        message={deleteModal?.message ?? ''}
+        confirmLabel={deleteModal?.confirmLabel}
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteConfirm(null)}
+      />
     </>
   )
 }

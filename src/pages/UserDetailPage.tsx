@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import DataPanel, { ErrorBanner, LoadingState } from '../components/DataPanel'
+import ConfirmModal from '../components/ConfirmModal'
+import DataPanel, { ErrorBanner } from '../components/DataPanel'
+import LoadingOverlay from '../components/LoadingOverlay'
 import PageHeader from '../components/PageHeader'
 import RoleBadge from '../components/RoleBadge'
 import { api } from '../lib/api'
@@ -21,9 +23,11 @@ export default function UserDetailPage() {
   const qc = useQueryClient()
   const currentUser = getStoredUser()
 
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<UserRole>('athlete')
   const [error, setError] = useState<string | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const q = useQuery({
     queryKey: ['admin', 'users', id],
@@ -33,12 +37,19 @@ export default function UserDetailPage() {
 
   useEffect(() => {
     if (!q.data) return
+    setDisplayName(q.data.displayName ?? '')
     setEmail(q.data.email)
     setRole(q.data.role)
   }, [q.data])
 
   const save = useMutation({
-    mutationFn: async () => (await api.patch(`/admin/users/${id}`, { email, role })).data,
+    mutationFn: async () => {
+      const payload: Record<string, string> = { email, role }
+      if (role !== 'admin') {
+        payload.displayName = displayName.trim()
+      }
+      return (await api.patch(`/admin/users/${id}`, payload)).data
+    },
     onSuccess: async () => {
       setError(null)
       await qc.invalidateQueries({ queryKey: ['admin', 'users'] })
@@ -63,17 +74,37 @@ export default function UserDetailPage() {
   })
 
   const isSelf = currentUser?.id === id
-  const isDirty = q.data ? email !== q.data.email || role !== q.data.role : false
+  const nameEditable = role !== 'admin'
+  const isDirty = q.data
+    ? displayName.trim() !== (q.data.displayName ?? '').trim() ||
+      email !== q.data.email ||
+      role !== q.data.role
+    : false
 
   function handleDelete() {
-    const label = q.data?.displayName || q.data?.email || 'this user'
-    const ok = window.confirm(`Delete "${label}"? This cannot be undone from the admin panel.`)
-    if (!ok) return
+    setDeleteOpen(true)
+  }
+
+  function confirmDelete() {
+    setDeleteOpen(false)
     remove.mutate()
   }
 
+  const deleteLabel = q.data?.displayName || q.data?.email || 'this user'
+
   return (
     <>
+      <LoadingOverlay
+        show={q.isLoading || q.isFetching || save.isPending || remove.isPending}
+        label={
+          remove.isPending
+            ? 'Deleting user…'
+            : save.isPending
+              ? 'Saving changes…'
+              : 'Loading user…'
+        }
+      />
+
       <PageHeader
         title={q.data?.displayName || q.data?.email || 'User'}
         description="View account details, update email/role, or remove the account."
@@ -101,17 +132,12 @@ export default function UserDetailPage() {
       />
 
       <DataPanel>
-        {q.isLoading ? <LoadingState /> : null}
         {q.isError ? <ErrorBanner message="Failed to load user details." /> : null}
         {error ? <div className="alert alertError">{error}</div> : null}
 
         {q.data ? (
           <div style={{ padding: 22 }}>
             <div className="detailGrid">
-              <div className="detailItem">
-                <div className="detailItemLabel">Display name</div>
-                <div className="detailItemValue">{q.data.displayName || '—'}</div>
-              </div>
               <div className="detailItem">
                 <div className="detailItemLabel">Current role</div>
                 <div className="detailItemValue">
@@ -137,7 +163,20 @@ export default function UserDetailPage() {
               }}
             >
               <div className="rolePanelTitle">Edit account</div>
-              <div className="rolePanelDesc">Update email or role. Sessions refresh on next login.</div>
+              <div className="rolePanelDesc">Update name, email, or role.</div>
+
+              <label className="field">
+                <span className="fieldLabel">Name</span>
+                <input
+                  className="input"
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder={nameEditable ? 'Full name' : 'Not available for admin accounts'}
+                  disabled={!nameEditable}
+                  required={nameEditable}
+                />
+              </label>
 
               <label className="field">
                 <span className="fieldLabel">Email</span>
@@ -179,6 +218,15 @@ export default function UserDetailPage() {
           </div>
         ) : null}
       </DataPanel>
+
+      <ConfirmModal
+        open={deleteOpen}
+        title="Delete user"
+        message={`Delete "${deleteLabel}"?\n\nThis soft-deletes the account and revokes active sessions.`}
+        confirmLabel="Delete user"
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteOpen(false)}
+      />
     </>
   )
 }
