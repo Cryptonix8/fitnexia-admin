@@ -591,6 +591,12 @@ button, input, select, textarea { font: inherit; }
 
 .tableWrap { overflow-x: auto; }
 
+.tableWrapBusy {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

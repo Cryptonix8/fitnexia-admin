@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient, useIsFetching } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ConfirmModal from '../components/ConfirmModal'
-import DataPanel, { EmptyState, ErrorBanner } from '../components/DataPanel'
+import DataPanel, { EmptyState, ErrorBanner, LoadingState } from '../components/DataPanel'
 import LoadingOverlay from '../components/LoadingOverlay'
 import Pagination from '../components/Pagination'
 import PageHeader from '../components/PageHeader'
@@ -90,8 +90,6 @@ export default function UsersPage() {
     placeholderData: (previousData) => previousData,
   })
 
-  const usersFetchingCount = useIsFetching({ queryKey: ['admin', 'users'] })
-
   const pageUsers = listQuery.data?.data ?? []
   const selectableUsers = pageUsers.filter((u) => u.id !== currentUser?.id)
   const selectedOnPage = selectableUsers.filter((u) => selectedIds.has(u.id))
@@ -146,13 +144,14 @@ export default function UsersPage() {
   })
 
   const totalPages = listQuery.data?.meta.totalPages ?? 1
-  const isPageLoading =
-    usersFetchingCount > 0 || listQuery.isPending || listQuery.isFetching
+  const isInitialLoading = listQuery.isLoading && listQuery.data === undefined
+  const isRefetching = listQuery.isFetching && !isInitialLoading
   const isDeleting = remove.isPending || bulkRemove.isPending
-  const isSearching = Boolean(q || roleFilter)
 
-  function applySearchQuery(nextQ: string) {
-    const trimmed = nextQ.trim()
+  function handleSearchChange(value: string) {
+    setSearchInput(value)
+    const trimmed = value.trim()
+    if (trimmed === q) return
     setSearchParams(
       buildParams({
         page: '1',
@@ -160,10 +159,6 @@ export default function UsersPage() {
         role: roleFilter,
       }),
     )
-  }
-
-  function handleSearchKeyUp(e: React.KeyboardEvent<HTMLInputElement>) {
-    applySearchQuery(e.currentTarget.value)
   }
 
   function changePage(nextPage: number) {
@@ -239,15 +234,13 @@ export default function UsersPage() {
   return (
     <>
       <LoadingOverlay
-        show={isPageLoading || isDeleting}
+        show={isInitialLoading || isDeleting}
         label={
           isDeleting
             ? bulkRemove.isPending
               ? 'Deleting selected users…'
               : 'Deleting user…'
-            : isSearching
-              ? 'Searching users…'
-              : 'Loading users…'
+            : 'Loading users…'
         }
       />
 
@@ -267,8 +260,7 @@ export default function UsersPage() {
               type="search"
               placeholder="Name or email…"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyUp={handleSearchKeyUp}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
           </label>
 
@@ -318,12 +310,15 @@ export default function UsersPage() {
             {listQuery.data ? (
               <span className="pill">{listQuery.data.meta.total.toLocaleString()} matching</span>
             ) : null}
+            {isRefetching ? <span className="pill">Updating…</span> : null}
           </div>
         }
       >
         {listQuery.isError ? <ErrorBanner message="Failed to load users." /> : null}
 
-        {listQuery.data && listQuery.data.data.length === 0 ? (
+        {isInitialLoading ? <LoadingState label="Loading users…" /> : null}
+
+        {!isInitialLoading && listQuery.data && listQuery.data.data.length === 0 ? (
           <EmptyState
             title="No users found"
             description={
@@ -334,9 +329,9 @@ export default function UsersPage() {
           />
         ) : null}
 
-        {listQuery.data && listQuery.data.data.length > 0 ? (
+        {!isInitialLoading && listQuery.data && listQuery.data.data.length > 0 ? (
           <>
-            <div className="tableWrap">
+            <div className={`tableWrap${isRefetching ? ' tableWrapBusy' : ''}`}>
               <table className="table">
                 <thead>
                   <tr>
