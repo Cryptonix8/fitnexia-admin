@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, useIsFetching } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ConfirmModal from '../components/ConfirmModal'
@@ -87,7 +87,10 @@ export default function UsersPage() {
     queryKey: ['admin', 'users', queryParams],
     queryFn: async () =>
       (await api.get<Paginated<AdminUserListItem>>('/admin/users', { params: queryParams })).data,
+    placeholderData: (previousData) => previousData,
   })
+
+  const usersFetchingCount = useIsFetching({ queryKey: ['admin', 'users'] })
 
   const pageUsers = listQuery.data?.data ?? []
   const selectableUsers = pageUsers.filter((u) => u.id !== currentUser?.id)
@@ -143,8 +146,10 @@ export default function UsersPage() {
   })
 
   const totalPages = listQuery.data?.meta.totalPages ?? 1
-  const isPageLoading = listQuery.isLoading || listQuery.isFetching
+  const isPageLoading =
+    usersFetchingCount > 0 || listQuery.isPending || listQuery.isFetching
   const isDeleting = remove.isPending || bulkRemove.isPending
+  const isSearching = Boolean(q || roleFilter)
 
   function applySearchQuery(nextQ: string) {
     const trimmed = nextQ.trim()
@@ -240,7 +245,9 @@ export default function UsersPage() {
             ? bulkRemove.isPending
               ? 'Deleting selected users…'
               : 'Deleting user…'
-            : 'Loading users…'
+            : isSearching
+              ? 'Searching users…'
+              : 'Loading users…'
         }
       />
 
