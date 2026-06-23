@@ -5,6 +5,7 @@ import MetricsPage from './pages/MetricsPage'
 import UsersPage from './pages/UsersPage'
 import UserDetailPage from './pages/UserDetailPage'
 import VerificationRequestsPage from './pages/VerificationRequestsPage'
+import InstitutionsPage from './pages/InstitutionsPage'
 import AdminProfilePage from './pages/AdminProfilePage'
 import RequireAuth from './components/RequireAuth'
 
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="metrics" element={<MetricsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="users/:id" element={<UserDetailPage />} />
+        <Route path="institutions" element={<InstitutionsPage />} />
         <Route path="verification" element={<VerificationRequestsPage />} />
         <Route path="profile" element={<AdminProfilePage />} />
       </Route>

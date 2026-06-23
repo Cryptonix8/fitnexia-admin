@@ -11,6 +11,7 @@ const SIDEBAR_COLLAPSED_KEY = 'fitnexia_admin_sidebar_collapsed'
 const navItems = [
   { to: '/metrics', label: 'Overview', icon: IconChart },
   { to: '/users', label: 'Users', icon: IconUsers },
+  { to: '/institutions', label: 'Institutions', icon: IconShield },
   { to: '/verification', label: 'Verification', icon: IconShield },
 ] as const
 
