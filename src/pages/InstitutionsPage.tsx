@@ -42,7 +42,7 @@ export default function InstitutionsPage() {
 
   return (
     <div>
-      <PageHeader title="Institutions" subtitle="Gym SaaS tiers and member usage" />
+      <PageHeader title="Institutions" description="Gym SaaS tiers and member usage" />
 
       <DataPanel>
         {error ? <ErrorBanner message="Could not load institutions." /> : null}
@@ -97,8 +97,8 @@ export default function InstitutionsPage() {
         {data ? (
           <Pagination
             page={page}
-            totalPages={Math.max(1, Math.ceil(data.total / limit))}
-            onPageChange={setPage}
+            totalPages={data.meta.totalPages}
+            onChange={setPage}
           />
         ) : null}
       </DataPanel>
