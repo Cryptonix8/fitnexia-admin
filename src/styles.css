@@ -649,6 +649,35 @@ button, input, select, textarea { font: inherit; }
 
 .tableCellSub { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
+.tableColNum {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.table th.tableColNum { text-align: right; }
+
+.tableNum {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.tableSelect {
+  width: auto;
+  min-width: 148px;
+  max-width: 100%;
+  padding: 8px 36px 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.tableSelect:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ─── Badges & alerts ───────────────────────────────────── */
 
 .badge {
