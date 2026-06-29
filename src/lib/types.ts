@@ -18,6 +18,15 @@ export type AdminUserListItem = {
   role: UserRole
   createdAt: string
   displayName?: string | null
+  avatarUrl?: string | null
+}
+
+export type VerificationDocument = {
+  id: string
+  documentType: 'dni_front' | 'dni_back' | 'certification'
+  mimeType: string
+  originalName?: string
+  createdAt: string
 }
 
 export type VerificationRequest = {
@@ -28,5 +37,6 @@ export type VerificationRequest = {
   subjectName?: string | null
   status: 'pending' | 'approved' | 'rejected'
   submittedAt: string
+  documents?: VerificationDocument[]
 }
 

@@ -222,7 +222,7 @@ export default function UserDetailPage() {
       <ConfirmModal
         open={deleteOpen}
         title="Delete user"
-        message={`Delete "${deleteLabel}"?\n\nThis soft-deletes the account and revokes active sessions.`}
+        message={`Delete "${deleteLabel}"?\n\nThis removes their account and all associated content (classes, memberships, etc.). Other users are not affected.`}
         confirmLabel="Delete user"
         onConfirm={confirmDelete}
         onClose={() => setDeleteOpen(false)}

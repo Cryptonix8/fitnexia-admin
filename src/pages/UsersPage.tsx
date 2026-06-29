@@ -8,6 +8,8 @@ import Pagination from '../components/Pagination'
 import PageHeader from '../components/PageHeader'
 import RoleBadge from '../components/RoleBadge'
 import UserEditModal from '../components/UserEditModal'
+import UserAvatar from '../components/UserAvatar'
+import AvatarPreviewModal from '../components/AvatarPreviewModal'
 import { IconPencil, IconTrash } from '../components/icons'
 import { api } from '../lib/api'
 import { getStoredUser } from '../lib/storage'
@@ -62,6 +64,7 @@ export default function UsersPage() {
   const [searchInput, setSearchInput] = useState(q)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingUser, setEditingUser] = useState<AdminUserListItem | null>(null)
+  const [previewUser, setPreviewUser] = useState<AdminUserListItem | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirm>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -220,13 +223,13 @@ export default function UsersPage() {
     deleteConfirm?.kind === 'single'
       ? {
           title: 'Delete user',
-          message: `Delete "${deleteConfirm.user.displayName || deleteConfirm.user.email}"?\n\nThis soft-deletes the account and revokes active sessions.`,
+          message: `Delete "${deleteConfirm.user.displayName || deleteConfirm.user.email}"?\n\nThis removes their account and all associated content (classes, memberships, etc.). Other users are not affected.`,
           confirmLabel: 'Delete user',
         }
       : deleteConfirm?.kind === 'bulk'
         ? {
             title: 'Delete selected users',
-            message: `Delete ${deleteConfirm.ids.length} selected user${deleteConfirm.ids.length === 1 ? '' : 's'}?\n\nThis soft-deletes the accounts and revokes active sessions.`,
+            message: `Delete ${deleteConfirm.ids.length} selected user${deleteConfirm.ids.length === 1 ? '' : 's'}?\n\nThis removes their accounts and all associated content. Other users are not affected.`,
             confirmLabel: 'Delete selected',
           }
         : null
@@ -346,6 +349,7 @@ export default function UsersPage() {
                         onChange={toggleSelectAllOnPage}
                       />
                     </th>
+                    <th className="tableAvatarCol">Avatar</th>
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
@@ -367,6 +371,14 @@ export default function UsersPage() {
                             disabled={isSelf || isDeleting}
                             aria-label={`Select ${u.email}`}
                             onChange={() => toggleUser(u.id)}
+                          />
+                        </td>
+                        <td className="tableAvatarCol">
+                          <UserAvatar
+                            name={u.displayName}
+                            email={u.email}
+                            avatarUrl={u.avatarUrl}
+                            onClick={() => setPreviewUser(u)}
                           />
                         </td>
                         <td>
@@ -425,6 +437,8 @@ export default function UsersPage() {
       </DataPanel>
 
       <UserEditModal user={editingUser} onClose={() => setEditingUser(null)} />
+
+      <AvatarPreviewModal user={previewUser} onClose={() => setPreviewUser(null)} />
 
       <ConfirmModal
         open={Boolean(deleteModal)}

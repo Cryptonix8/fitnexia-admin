@@ -31,5 +31,10 @@ Restart `npm run dev` after changing `.env`.
 
 ## Auth
 
-Sign in with an account that has `role=admin` in the backend database (promote via SQL on the VPS Postgres).
+After `npm run db:init` on the backend, sign in with the default admin:
+
+- **Email:** `admin@fitnexia.com`
+- **Password:** `admin123`
+
+Change this password in production. You can also promote any user via SQL: `UPDATE users SET role = 'admin' WHERE email = '...';`
 

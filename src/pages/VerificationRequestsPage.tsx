@@ -5,7 +5,7 @@ import LoadingOverlay from '../components/LoadingOverlay'
 import PageHeader from '../components/PageHeader'
 import RoleBadge from '../components/RoleBadge'
 import { api } from '../lib/api'
-import type { VerificationRequest } from '../lib/types'
+import type { VerificationDocument, VerificationRequest } from '../lib/types'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -14,6 +14,23 @@ function formatDate(iso: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+const DOC_LABELS: Record<string, string> = {
+  dni_front: 'ID — front',
+  dni_back: 'ID — back',
+  certification: 'Certification',
+}
+
+async function openDocument(requestId: string, doc: VerificationDocument) {
+  const res = await api.get(
+    `/admin/verification-requests/${requestId}/documents/${doc.id}`,
+    { responseType: 'blob' },
+  )
+  const blob = new Blob([res.data], { type: doc.mimeType })
+  const url = URL.createObjectURL(blob)
+  window.open(url, '_blank', 'noopener,noreferrer')
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 export default function VerificationRequestsPage() {
@@ -34,7 +51,7 @@ export default function VerificationRequestsPage() {
 
   const reject = useMutation({
     mutationFn: async ({ id, notes }: { id: string; notes: string }) =>
-      (await api.post(`/admin/verification-requests/${id}/reject`, { notes })).data,
+      (await api.post(`/admin/verification-requests/${id}/reject`, { reason: notes })).data,
     onSuccess: async () => qc.invalidateQueries({ queryKey: ['admin', 'verification-requests'] }),
   })
 
@@ -55,7 +72,7 @@ export default function VerificationRequestsPage() {
 
       <PageHeader
         title="Verification"
-        description="Review pending instructor and institution profile verification requests."
+        description="Review pending instructor and institution verification requests. Documents are private and only visible here."
       />
 
       <DataPanel
@@ -83,9 +100,22 @@ export default function VerificationRequestsPage() {
                     />
                   </div>
                   <div className="tableCellSub">Submitted {formatDate(r.submittedAt)}</div>
-                  <div className="tableMeta">
-                    {r.subjectType === 'instructor' ? r.instructorId : r.institutionId}
-                  </div>
+                  {r.documents && r.documents.length > 0 ? (
+                    <div className="docList">
+                      {r.documents.map((doc) => (
+                        <button
+                          key={doc.id}
+                          type="button"
+                          className="btn btnOutline btnSm"
+                          onClick={() => void openDocument(r.id, doc)}
+                        >
+                          {DOC_LABELS[doc.documentType] ?? doc.documentType}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="tableCellSub">No documents attached</div>
+                  )}
                 </div>
                 <div className="queueItemActions">
                   <div className="btnGroup">
@@ -98,7 +128,9 @@ export default function VerificationRequestsPage() {
                     </button>
                     <button
                       className="btn btnDanger btnSm"
-                      disabled={approve.isPending || reject.isPending}
+                      disabled={
+                        approve.isPending || reject.isPending || !(rejectNotes[r.id] ?? '').trim()
+                      }
                       onClick={() => reject.mutate({ id: r.id, notes: rejectNotes[r.id] ?? '' })}
                     >
                       Reject
@@ -106,7 +138,7 @@ export default function VerificationRequestsPage() {
                   </div>
                   <input
                     className="input"
-                    placeholder="Rejection reason (optional)"
+                    placeholder="Rejection reason (required to reject)"
                     value={rejectNotes[r.id] ?? ''}
                     onChange={(e) => setRejectNotes((s) => ({ ...s, [r.id]: e.target.value }))}
                   />

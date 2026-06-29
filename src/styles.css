@@ -426,6 +426,90 @@ button, input, select, textarea { font: inherit; }
   color: #fff;
   background: linear-gradient(135deg, var(--primary), #5b8def);
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.userAvatarSm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.userAvatarMd {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.userAvatarLg {
+  width: 220px;
+  height: 220px;
+  border-radius: 20px;
+  font-size: 48px;
+}
+
+.userAvatarImage {
+  background: var(--surface-muted);
+}
+
+.userAvatarButton {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.userAvatarButton:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.userAvatarButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.userAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tableAvatarCol {
+  width: 1%;
+  white-space: nowrap;
+  padding-left: 16px;
+  padding-right: 8px;
+}
+
+.table th.tableAvatarCol {
+  font-size: 11px;
+}
+
+.avatarPreviewModal {
+  max-width: 360px;
+}
+
+.avatarPreviewBody {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  padding-bottom: 28px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .userEmail {
@@ -1383,6 +1467,7 @@ button, input, select, textarea { font: inherit; }
 /* ─── Verification cards (mobile-friendly rows) ─────────── */
 
 .queueList { display: flex; flex-direction: column; }
+.docList { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
 .queueItem {
   display: grid;
